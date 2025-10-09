@@ -55,20 +55,21 @@
       
 <script>
 async function chargerPrix() {
-  const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRgxDduVF_zaFaY7tQRbDhYfElxVDEuEroZn-ta8hW2HVlpP2Zx5ME_hvBd97WgpQrYnQgvZANVbiCd/pub?gid=0&single=true&output=csv";
+  const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRgxDduVF_zaFaY7tQRbDhYfElxVDEuEroZn-ta8hW2HVlpP2Zx5ME_hvBd97WgpQrYnQgvZANVbiCd/gviz/tq?tqx=out:json";
 
   try {
-    const res = await fetch(url);
+    const res = await fetch(url + "&nocache=" + Date.now()); // éviter le cache
     const text = await res.text();
+    const json = JSON.parse(text.substring(47).slice(0, -2)); // format spécial Google
+    const lignes = json.table.rows;
 
-    const lignes = text.trim().split("\n").map(l => l.split(","));
     const prixProduits = {};
-
-    // Skip header
-    for (let i = 1; i < lignes.length; i++) {
-      const [nom, nouveauPrix, ancienPrix] = lignes[i].map(x => x.trim());
-      if (nom) prixProduits[nom] = { nouveauPrix, ancienPrix };
-    }
+    lignes.forEach(l => {
+      const nom = l.c[0]?.v?.trim();              // Nom du produit
+      const prix = l.c[1]?.v?.trim();             // Prix
+      const promo = l.c[2]?.v?.trim();            // Prix promotionnel
+      if (nom) prixProduits[nom] = { prix, promo };
+    });
 
     document.querySelectorAll("[data-name]").forEach(carte => {
       const nom = carte.dataset.name.trim();
@@ -76,24 +77,33 @@ async function chargerPrix() {
       if (!info) return;
 
       const spanPrix = carte.querySelector(".price-text");
-      if (info.ancienPrix) {
+
+      if (info.promo) {
+        // Afficher prix barré + promo
         spanPrix.innerHTML = `
-          <span style="text-decoration:line-through; opacity:0.8;">${info.ancienPrix}</span>
-          <span style="margin-left:8px;">${info.nouveauPrix}</span>
+          <span style="text-decoration:line-through; opacity:0.8;">${info.prix}</span>
+          <span style="margin-left:8px;">${info.promo} DT TTC</span>
           <span style="background:yellow; color:red; font-size:0.8em; margin-left:6px; padding:2px 6px; border-radius:5px;">Promo</span>
         `;
       } else {
-        spanPrix.textContent = "Prix : " + info.nouveauPrix;
+        // Afficher seulement le prix normal
+        spanPrix.textContent = "Prix : " + info.prix+" DT TTC";
       }
     });
+
+    console.log("✅ Prix mis à jour à", new Date().toLocaleTimeString());
   } catch (err) {
     console.error("Erreur lors du chargement des prix :", err);
   }
 }
 
+// Premier chargement
 chargerPrix();
-setInterval(chargerPrix, 600000);
+
+// Actualisation toutes les 5 minutes
+setInterval(chargerPrix, 300000);
 </script>
+
 
 
 	  
